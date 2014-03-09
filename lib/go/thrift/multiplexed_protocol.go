@@ -12,7 +12,7 @@ const (
  * <p>NOTE: THIS IS NOT USED BY SERVERS.  On the server, use {@link org.apache.thrift.TMultiplexedProcessor TMultiplexedProcessor} to handle requests
  * from a multiplexing client.
  *
- * <p>This example uses a single socket transport to invoke two services:
+ * <p>This Java example uses a single socket transport to invoke two services:
  *
  * <blockquote><code>
  *     TSocket transport = new TSocket("localhost", 9090);<br/>
@@ -35,6 +35,10 @@ const (
 type TMultiplexedProtocol struct {
 	TProtocolDecorator
 	serviceName string
+}
+
+func NewMultiplexedProtocol(p TProtocolDecorator, serviceName string) TMultiplexedProtocol {
+	return TMultiplexedProtocol{p, serviceName}
 }
 
 /**
