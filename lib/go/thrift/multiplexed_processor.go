@@ -106,7 +106,7 @@ func (p *TMultiplexedProcessor) Process(in, out TProtocol) (bool, TException) {
 
 	// Extract the service name
 	index := strings.Index(name, SEPARATOR)
-	if index < 0 {
+	if index < 0 || index >= len(name)-1 {
 		return false, TException(fmt.Errorf(
 			"Service name not found in message name: " + name + ".  Did you " +
 				"forget to use a TMultiplexProtocol in your client?"))
@@ -122,7 +122,7 @@ func (p *TMultiplexedProcessor) Process(in, out TProtocol) (bool, TException) {
 	}
 
 	// Remove the service name from the message name
-	standardName := name[index:]
+	standardName := name[index+1:]
 
 	// Dispatch processing to the stored processor
 	return actualProcessor.Process(

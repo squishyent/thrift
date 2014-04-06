@@ -47,6 +47,10 @@ func NewTMemoryBufferTransportFactory(size int) *TMemoryBufferTransportFactory {
 	return &TMemoryBufferTransportFactory{size: size}
 }
 
+func NewTMemoryReader(s string) *TMemoryBuffer {
+	return &TMemoryBuffer{Buffer: bytes.NewBufferString(s), size: len(s)}
+}
+
 func NewTMemoryBuffer() *TMemoryBuffer {
 	return &TMemoryBuffer{Buffer: &bytes.Buffer{}, size: 0}
 }

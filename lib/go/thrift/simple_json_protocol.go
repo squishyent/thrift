@@ -528,7 +528,11 @@ func (p *TSimpleJSONProtocol) ReadBinary() ([]byte, error) {
 }
 
 func (p *TSimpleJSONProtocol) Flush() (err error) {
-	return NewTProtocolException(p.writer.Flush())
+	err = p.writer.Flush()
+	if err == nil {
+		err = p.trans.Flush()
+	}
+	return NewTProtocolException(err)
 }
 
 func (p *TSimpleJSONProtocol) Skip(fieldType TType) (err error) {
