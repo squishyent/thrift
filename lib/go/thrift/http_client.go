@@ -21,16 +21,17 @@ package thrift
 
 import (
 	"bytes"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
 )
 
 type THttpClient struct {
-	response           *http.Response
 	url                *url.URL
 	client             *http.Client
 	requestBuffer      *bytes.Buffer
+	responseBuffer     *bytes.Buffer
 	nsecConnectTimeout int64
 	nsecReadTimeout    int64
 }
@@ -93,7 +94,17 @@ func NewTHttpClientWithClient(urlstr string, client *http.Client) (TTransport, e
 	if err != nil {
 		return nil, err
 	}
-	return &THttpClient{response: response, url: parsedURL, client: client}, nil
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		// TODO(pomack) log bad response
+		return nil, NewTTransportException(UNKNOWN_TRANSPORT_EXCEPTION, "HTTP Response code: "+strconv.Itoa(response.StatusCode))
+	}
+	responseBuffer := &bytes.Buffer{}
+	_, err = io.Copy(responseBuffer, response.Body)
+	if err != nil {
+		return nil, err
+	}
+	return &THttpClient{responseBuffer: responseBuffer, url: parsedURL, client: client}, nil
 }
 
 func NewTHttpPostClient(urlstr string) (TTransport, error) {
@@ -115,7 +126,7 @@ func (p *THttpClient) Open() error {
 }
 
 func (p *THttpClient) IsOpen() bool {
-	return p.response != nil || p.requestBuffer != nil
+	return p.responseBuffer != nil || p.requestBuffer != nil
 }
 
 func (p *THttpClient) Peek() bool {
@@ -123,23 +134,15 @@ func (p *THttpClient) Peek() bool {
 }
 
 func (p *THttpClient) Close() error {
-	if p.response != nil && p.response.Body != nil {
-		err := p.response.Body.Close()
-		p.response = nil
-		return err
-	}
-	if p.requestBuffer != nil {
-		p.requestBuffer.Reset()
-		p.requestBuffer = nil
-	}
+	p.responseBuffer = nil
 	return nil
 }
 
 func (p *THttpClient) Read(buf []byte) (int, error) {
-	if p.response == nil {
+	if p.responseBuffer == nil {
 		return 0, NewTTransportException(NOT_OPEN, "Response buffer is empty, no request.")
 	}
-	n, err := p.response.Body.Read(buf)
+	n, err := p.responseBuffer.Read(buf)
 	return n, NewTTransportExceptionFromError(err)
 }
 
@@ -156,10 +159,12 @@ func (p *THttpClient) Flush() error {
 	if err != nil {
 		return NewTTransportExceptionFromError(err)
 	}
+	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
 		// TODO(pomack) log bad response
 		return NewTTransportException(UNKNOWN_TRANSPORT_EXCEPTION, "HTTP Response code: "+strconv.Itoa(response.StatusCode))
 	}
-	p.response = response
-	return nil
+	p.responseBuffer = &bytes.Buffer{}
+	_, err = io.Copy(p.responseBuffer, response.Body)
+	return err
 }
