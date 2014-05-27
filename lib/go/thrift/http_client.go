@@ -29,6 +29,7 @@ import (
 type THttpClient struct {
 	response           *http.Response
 	url                *url.URL
+	client             *http.Client
 	requestBuffer      *bytes.Buffer
 	nsecConnectTimeout int64
 	nsecReadTimeout    int64
@@ -37,6 +38,7 @@ type THttpClient struct {
 type THttpClientTransportFactory struct {
 	url    string
 	isPost bool
+	client *http.Client
 }
 
 func (p *THttpClientTransportFactory) GetTransport(trans TTransport) TTransport {
@@ -67,25 +69,44 @@ func NewTHttpPostClientTransportFactory(url string) *THttpClientTransportFactory
 	return &THttpClientTransportFactory{url: url, isPost: true}
 }
 
+func NewTHttpClientTransportFactoryWithClient(url string, client *http.Client) *THttpClientTransportFactory {
+	return &THttpClientTransportFactory{url: url, isPost: false, client: client}
+}
+
+func NewTHttpPostClientTransportFactoryWithClient(url string, client *http.Client) *THttpClientTransportFactory {
+	return &THttpClientTransportFactory{url: url, isPost: true, client: client}
+}
+
 func NewTHttpClient(urlstr string) (TTransport, error) {
+	return NewTHttpClientWithClient(urlstr, nil)
+}
+
+func NewTHttpClientWithClient(urlstr string, client *http.Client) (TTransport, error) {
 	parsedURL, err := url.Parse(urlstr)
 	if err != nil {
 		return nil, err
 	}
-	response, err := http.Get(urlstr)
+	if client == nil {
+		client = http.DefaultClient
+	}
+	response, err := client.Get(urlstr)
 	if err != nil {
 		return nil, err
 	}
-	return &THttpClient{response: response, url: parsedURL}, nil
+	return &THttpClient{response: response, url: parsedURL, client: client}, nil
 }
 
 func NewTHttpPostClient(urlstr string) (TTransport, error) {
+	return NewTHttpPostClientWithClient(urlstr, nil)
+}
+
+func NewTHttpPostClientWithClient(urlstr string, client *http.Client) (TTransport, error) {
 	parsedURL, err := url.Parse(urlstr)
 	if err != nil {
 		return nil, err
 	}
 	buf := make([]byte, 0, 1024)
-	return &THttpClient{url: parsedURL, requestBuffer: bytes.NewBuffer(buf)}, nil
+	return &THttpClient{url: parsedURL, requestBuffer: bytes.NewBuffer(buf), client: client}, nil
 }
 
 func (p *THttpClient) Open() error {
@@ -128,7 +149,10 @@ func (p *THttpClient) Write(buf []byte) (int, error) {
 }
 
 func (p *THttpClient) Flush() error {
-	response, err := http.Post(p.url.String(), "application/x-thrift", p.requestBuffer)
+	if p.client == nil {
+		p.client = http.DefaultClient
+	}
+	response, err := p.client.Post(p.url.String(), "application/x-thrift", p.requestBuffer)
 	if err != nil {
 		return NewTTransportExceptionFromError(err)
 	}
