@@ -77,12 +77,14 @@ func (srv *THttpServer) Stop() error {
 func (srv *THttpServer) Handle(w http.ResponseWriter, req *http.Request) {
 
 	// Handle CORS requests
+	if srv.cors {
+		w.Header().Add("Access-Control-Allow-Origin", "*")
+	}
 	if req.Method == "OPTIONS" {
 		if !srv.cors {
 			w.WriteHeader(http.StatusForbidden)
 			return
 		} else {
-			w.Header().Add("Access-Control-Allow-Origin", "*")
 			w.Header().Add("Access-Control-Allow-Methods", "POST")
 			if v := req.Header.Get("Access-Control-Request-Headers"); v != "" {
 				w.Header().Add("Access-Control-Allow-Headers", v)
