@@ -16,6 +16,7 @@ import (
 
 type THttpServer struct {
 	addr              string
+	cors              bool
 	certFile, keyFile string
 	LastError         error
 
@@ -53,6 +54,11 @@ func NewHttpsServer(addr, certFile, keyFile string, processorFactory TProcessorF
 	}
 }
 
+// Enable or disable CORS support
+func (srv *THttpServer) SetCorsEnabled(enabled bool) {
+	srv.cors = enabled
+}
+
 // Starts listening to the address and processing requests
 func (srv *THttpServer) Serve() error {
 	if srv.certFile != "" {
@@ -69,6 +75,21 @@ func (srv *THttpServer) Stop() error {
 
 // Handles a single HTTP request
 func (srv *THttpServer) Handle(w http.ResponseWriter, req *http.Request) {
+
+	// Handle CORS requests
+	if req.Method == "OPTIONS" {
+		if !srv.cors {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		} else {
+			w.Header().Add("Access-Control-Allow-Origin", "*")
+			w.Header().Add("Access-Control-Allow-Methods", "POST")
+			if v := req.Header.Get("Access-Control-Request-Headers"); v != "" {
+				w.Header().Add("Access-Control-Allow-Headers", v)
+			}
+			return
+		}
+	}
 
 	// Prepare the protocol stack
 	client := &StreamTransport{
